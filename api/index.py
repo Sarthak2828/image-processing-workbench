@@ -8,13 +8,9 @@ from pydantic import BaseModel
 from PIL import Image
 import numpy as np
 
-# Ensure both api/ directory and root directory are in python path
+# Force python to search the api/ directory first, bypassing root image_operations.py (which contains matplotlib imports)
 current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.abspath(os.path.join(current_dir, ".."))
-if current_dir not in sys.path:
-    sys.path.append(current_dir)
-if parent_dir not in sys.path:
-    sys.path.append(parent_dir)
+sys.path.insert(0, current_dir)
 
 # Import backend operations
 import image_operations as img_ops
