@@ -8,10 +8,6 @@
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
     
-    <!-- PyScript CSS & JS -->
-    <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css" />
-    <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
-    
     <style>
         :root {
             --bg-color: #1a252f;
@@ -48,20 +44,27 @@
             overflow: hidden;
         }
 
-        /* Loading Overlay */
+        /* Loading Spinner */
         #loading-overlay {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(26, 37, 47, 0.95);
+            background-color: rgba(26, 37, 47, 0.7);
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             z-index: 1000;
-            transition: opacity 0.5s ease;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+
+        #loading-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
         }
 
         .spinner {
@@ -82,12 +85,6 @@
             font-family: 'Outfit', sans-serif;
             font-weight: 600;
             color: white;
-        }
-
-        #loading-overlay p {
-            margin-top: 10px;
-            color: #bdc3c7;
-            font-size: 14px;
         }
 
         /* Main Workspace Layout */
@@ -344,15 +341,6 @@
             object-fit: contain;
         }
 
-        /* Crop overlay selection box */
-        #crop-box {
-            position: absolute;
-            border: 2px dashed yellow;
-            background-color: rgba(255, 255, 0, 0.1);
-            display: none;
-            pointer-events: none;
-        }
-
         /* Status Bar (Matches app.py) */
         .status-bar {
             background-color: var(--status-bg);
@@ -368,11 +356,10 @@
 </head>
 <body>
 
-    <!-- Loading screen while PyScript initializes Pyodide, NumPy, and Pillow -->
+    <!-- Light loading indicator overlay -->
     <div id="loading-overlay">
         <div class="spinner"></div>
-        <h2>Initializing Web Assembly Environment...</h2>
-        <p>Downloading Python runtime, NumPy, and Pillow packages</p>
+        <h2>Processing Image...</h2>
     </div>
 
     <!-- Main Workspace -->
@@ -385,7 +372,7 @@
             <div class="sidebar-fixed">
                 <label for="file-input" class="btn-upload-label">Upload Image</label>
                 <input type="file" id="file-input" accept="image/*">
-                <button class="btn-reset" onclick="pyscript.interpreter.globals.get('web_reset_image')()">Reset Image</button>
+                <button class="btn-reset" onclick="web_reset_image()">Reset Image</button>
             </div>
             
             <!-- Scrollable Controls -->
@@ -400,7 +387,7 @@
                             <span>Brightness</span>
                             <span id="val-bright">1.0</span>
                         </div>
-                        <input type="range" id="slider-bright" min="0.0" max="2.0" step="0.05" value="1.0" oninput="document.getElementById('val-bright').innerText = this.value; pyscript.interpreter.globals.get('web_on_point_change')()">
+                        <input type="range" id="slider-bright" min="0.0" max="2.0" step="0.05" value="1.0" oninput="document.getElementById('val-bright').innerText = this.value; web_on_point_change()">
                     </div>
 
                     <div class="slider-container">
@@ -408,22 +395,22 @@
                             <span>Contrast</span>
                             <span id="val-contrast">1.0</span>
                         </div>
-                        <input type="range" id="slider-contrast" min="0.0" max="3.0" step="0.05" value="1.0" oninput="document.getElementById('val-contrast').innerText = this.value; pyscript.interpreter.globals.get('web_on_point_change')()">
+                        <input type="range" id="slider-contrast" min="0.0" max="3.0" step="0.05" value="1.0" oninput="document.getElementById('val-contrast').innerText = this.value; web_on_point_change()">
                     </div>
 
                     <div class="btn-grid">
-                        <button class="btn-action" onclick="pyscript.interpreter.globals.get('web_apply_grayscale')()">Grayscale (B&W)</button>
-                        <button class="btn-action" onclick="pyscript.interpreter.globals.get('web_apply_negative')()">Negative (Invert)</button>
-                        <button class="btn-action btn-action-full" onclick="pyscript.interpreter.globals.get('web_apply_equalize')()">Equalize Histogram</button>
+                        <button class="btn-action" onclick="applyOperation('grayscale')">Grayscale (B&W)</button>
+                        <button class="btn-action" onclick="applyOperation('negative')">Negative (Invert)</button>
+                        <button class="btn-action btn-action-full" onclick="applyOperation('equalize')">Equalize Histogram</button>
                     </div>
 
                     <div class="sub-label">Binary Thresholding</div>
                     <div style="display: flex; gap: 8px; align-items: center;">
                         <input type="range" id="slider-thresh" min="0" max="255" value="128" style="flex: 1;" oninput="document.getElementById('val-thresh').innerText = this.value">
                         <span id="val-thresh" style="font-size: 12px; min-width: 25px;">128</span>
-                        <button class="btn-action" style="padding: 6px 10px;" onclick="pyscript.interpreter.globals.get('web_apply_threshold')()">Apply</button>
+                        <button class="btn-action" style="padding: 6px 10px;" onclick="applyThreshold()">Apply</button>
                     </div>
-                    <button class="btn-action" onclick="pyscript.interpreter.globals.get('web_apply_otsu')()">Otsu Auto Thresholding</button>
+                    <button class="btn-action" onclick="applyOperation('otsu')">Otsu Auto Thresholding</button>
                 </div>
 
                 <!-- Smoothing & Sharpening -->
@@ -442,26 +429,26 @@
                         </select>
                     </div>
                     <div class="btn-grid-3">
-                        <button class="btn-action" onclick="pyscript.interpreter.globals.get('web_apply_box_blur')()">Box</button>
-                        <button class="btn-action" onclick="pyscript.interpreter.globals.get('web_apply_gaussian_blur')()">Gaussian</button>
-                        <button class="btn-action" onclick="pyscript.interpreter.globals.get('web_apply_median')()">Median</button>
+                        <button class="btn-action" onclick="applyBlur('box_blur')">Box</button>
+                        <button class="btn-action" onclick="applyBlur('gaussian_blur')">Gaussian</button>
+                        <button class="btn-action" onclick="applyBlur('median')">Median</button>
                     </div>
 
                     <div class="sub-label">Image Sharpening</div>
                     <div class="btn-grid">
-                        <button class="btn-action" onclick="pyscript.interpreter.globals.get('web_apply_sharpen')()">Laplacian</button>
-                        <button class="btn-action" onclick="pyscript.interpreter.globals.get('web_apply_unsharp')()">Unsharp Mask</button>
+                        <button class="btn-action" onclick="applyOperation('sharpen')">Laplacian</button>
+                        <button class="btn-action" onclick="applyOperation('unsharp')">Unsharp Mask</button>
                     </div>
 
                     <div class="sub-label">Edge Detection</div>
                     <div class="btn-grid-3">
-                        <button class="btn-action" onclick="pyscript.interpreter.globals.get('web_apply_sobel')()">Sobel</button>
-                        <button class="btn-action" onclick="pyscript.interpreter.globals.get('web_apply_prewitt')()">Prewitt</button>
-                        <button class="btn-action" onclick="pyscript.interpreter.globals.get('web_apply_canny')()">Canny</button>
+                        <button class="btn-action" onclick="applyOperation('sobel')">Sobel</button>
+                        <button class="btn-action" onclick="applyOperation('prewitt')">Prewitt</button>
+                        <button class="btn-action" onclick="applyOperation('canny')">Canny</button>
                     </div>
                     <div class="btn-grid">
-                        <button class="btn-action" onclick="pyscript.interpreter.globals.get('web_apply_log')()">LoG</button>
-                        <button class="btn-action" onclick="pyscript.interpreter.globals.get('web_apply_dog')()">DoG</button>
+                        <button class="btn-action" onclick="applyOperation('log')">LoG</button>
+                        <button class="btn-action" onclick="applyOperation('dog')">DoG</button>
                     </div>
                 </div>
 
@@ -469,10 +456,10 @@
                 <div class="ctrl-group">
                     <div class="group-label">Transforms & Mirroring</div>
                     <div class="btn-grid">
-                        <button class="btn-action" onclick="pyscript.interpreter.globals.get('web_apply_mirror')('horizontal')">Mirror H</button>
-                        <button class="btn-action" onclick="pyscript.interpreter.globals.get('web_apply_mirror')('vertical')">Mirror V</button>
-                        <button class="btn-action" onclick="pyscript.interpreter.globals.get('web_apply_rotate')(90)">Rotate 90 L</button>
-                        <button class="btn-action" onclick="pyscript.interpreter.globals.get('web_apply_rotate')(-90)">Rotate 90 R</button>
+                        <button class="btn-action" onclick="applyOperation('mirror', {direction: 'horizontal'})">Mirror H</button>
+                        <button class="btn-action" onclick="applyOperation('mirror', {direction: 'vertical'})">Mirror V</button>
+                        <button class="btn-action" onclick="applyOperation('rotate', {angle: 90})">Rotate 90 L</button>
+                        <button class="btn-action" onclick="applyOperation('rotate', {angle: -90})">Rotate 90 R</button>
                     </div>
                     
                     <div class="sub-label">Simple Web Bounding Box Crop</div>
@@ -490,7 +477,7 @@
                         </div>
                         <input type="range" id="slider-crop-right" min="50" max="100" value="90" oninput="document.getElementById('val-crop-right').innerText = this.value">
                     </div>
-                    <button class="btn-action btn-orange" onclick="pyscript.interpreter.globals.get('web_apply_crop')()">Apply Crop Bounds</button>
+                    <button class="btn-action btn-orange" onclick="applyCrop()">Apply Crop Bounds</button>
                 </div>
 
                 <!-- Color spaces -->
@@ -509,7 +496,7 @@
                             <option value="2">Channel 3</option>
                         </select>
                     </div>
-                    <button class="btn-action" onclick="pyscript.interpreter.globals.get('web_apply_extract')()">Extract Channel</button>
+                    <button class="btn-action" onclick="applyChannelExtract()">Extract Channel</button>
 
                     <div class="sub-label">Pseudo-color Mapping</div>
                     <div style="display: flex; gap: 8px;">
@@ -520,16 +507,16 @@
                             <option value="plasma">plasma</option>
                             <option value="inferno">inferno</option>
                         </select>
-                        <button class="btn-action" onclick="pyscript.interpreter.globals.get('web_apply_pseudocolor')()">Apply</button>
+                        <button class="btn-action" onclick="applyPseudocolor()">Apply</button>
                     </div>
                     
-                    <button class="btn-action btn-action-full" style="margin-top: 5px;" onclick="pyscript.interpreter.globals.get('web_apply_rgb_hist')()">Show RGB Histogram</button>
+                    <button class="btn-action btn-action-full" style="margin-top: 5px;" onclick="applyOperation('rgb_hist')">Show RGB Histogram</button>
                 </div>
 
                 <!-- Frequency Domain -->
                 <div class="ctrl-group">
                     <div class="group-label">Frequency Domain (DFT)</div>
-                    <button class="btn-action" onclick="pyscript.interpreter.globals.get('web_apply_fft')()">Show Log FFT Spectrum</button>
+                    <button class="btn-action" onclick="applyOperation('fft')">Show Log FFT Spectrum</button>
                     
                     <div class="sub-label">Fourier Domain Filters</div>
                     <select id="select-freq-filt" style="margin-bottom: 5px;">
@@ -545,15 +532,15 @@
                         </div>
                         <input type="range" id="slider-cutoff" min="5" max="150" value="30" oninput="document.getElementById('val-cutoff').innerText = this.value">
                     </div>
-                    <button class="btn-action" style="margin-top: 5px;" onclick="pyscript.interpreter.globals.get('web_apply_freq_filter')()">Apply FFT Filter</button>
+                    <button class="btn-action" style="margin-top: 5px;" onclick="applyFrequencyFilter()">Apply FFT Filter</button>
                 </div>
 
                 <!-- Features & Segmentation -->
                 <div class="ctrl-group">
                     <div class="group-label">Features & Segmentation</div>
                     <div class="btn-grid">
-                        <button class="btn-action" onclick="pyscript.interpreter.globals.get('web_apply_harris')()">Harris Corners</button>
-                        <button class="btn-action" onclick="pyscript.interpreter.globals.get('web_apply_lbp')()">LBP Texture</button>
+                        <button class="btn-action" onclick="applyOperation('harris')">Harris Corners</button>
+                        <button class="btn-action" onclick="applyOperation('lbp')">LBP Texture</button>
                     </div>
 
                     <div class="sub-label">K-Means Clustering Segmentation</div>
@@ -564,7 +551,7 @@
                         </div>
                         <input type="range" id="slider-kmeans-k" min="2" max="8" value="3" oninput="document.getElementById('val-kmeans-k').innerText = this.value">
                     </div>
-                    <button class="btn-action" style="margin-top: 5px;" onclick="pyscript.interpreter.globals.get('web_apply_kmeans')()">Run K-Means</button>
+                    <button class="btn-action" style="margin-top: 5px;" onclick="applyKMeans()">Run K-Means</button>
 
                     <div class="sub-label">Binary Morphology</div>
                     <div style="display: flex; gap: 8px;">
@@ -574,7 +561,7 @@
                             <option value="opening">opening</option>
                             <option value="closing">closing</option>
                         </select>
-                        <button class="btn-action" onclick="pyscript.interpreter.globals.get('web_apply_morphology')()">Apply</button>
+                        <button class="btn-action" onclick="applyMorphology()">Apply</button>
                     </div>
                 </div>
 
@@ -584,8 +571,8 @@
                     <div class="sub-label">LSB Steganography</div>
                     <input type="text" id="txt-steg-msg" class="steg-input" placeholder="Secret message to hide...">
                     <div class="btn-grid" style="margin-top: 5px;">
-                        <button class="btn-action" onclick="pyscript.interpreter.globals.get('web_apply_steg_encode')()">Encode</button>
-                        <button class="btn-action" onclick="pyscript.interpreter.globals.get('web_apply_steg_decode')()">Decode</button>
+                        <button class="btn-action" onclick="applyStegEncode()">Encode</button>
+                        <button class="btn-action" onclick="applyStegDecode()">Decode</button>
                     </div>
 
                     <div class="sub-label">Block DCT Compression</div>
@@ -596,7 +583,7 @@
                         </div>
                         <input type="range" id="slider-dct-quality" min="5" max="100" value="50" oninput="document.getElementById('val-dct-quality').innerText = this.value">
                     </div>
-                    <button class="btn-action" style="margin-top: 5px;" onclick="pyscript.interpreter.globals.get('web_apply_dct')()">Apply Block DCT</button>
+                    <button class="btn-action" style="margin-top: 5px;" onclick="applyDCT()">Apply Block DCT</button>
                 </div>
 
             </div>
@@ -629,445 +616,245 @@
         Status: Ready. Load an image or modify parameters.
     </div>
 
-    <!-- Configuration for PyScript and its required libraries -->
-    <py-config>
-        packages = ["numpy", "pillow", "matplotlib"]
-        [[files]]
-        src = "./image_operations.py"
-        dest = "image_operations.py"
-    </py-config>
+    <!-- Frontend logic communicating with FastAPI backend API -->
+    <script>
+        let originalBase64 = null;
+        let currentBase64 = null;
+        const loader = document.getElementById('loading-overlay');
 
-    <!-- Python execution block for backend bridging -->
-    <script type="py">
-        from js import document, Uint8Array, window
-        import io
-        import base64
-        import numpy as np
-        from PIL import Image
-        import image_operations as img_ops
+        function set_status(text) {
+            document.getElementById("status-text").innerText = "Status: " + text;
+        }
 
-        # Global references
-        original_image = None
-        processed_image = None
+        // Handle File Upload
+        document.getElementById('file-input').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(evt) {
+                    originalBase64 = evt.target.result;
+                    currentBase64 = originalBase64;
+                    document.getElementById('img-orig').src = originalBase64;
+                    document.getElementById('img-proc').src = originalBase64;
+                    
+                    // Reset sliders
+                    document.getElementById("slider-bright").value = "1.0";
+                    document.getElementById("val-bright").innerText = "1.0";
+                    document.getElementById("slider-contrast").value = "1.0";
+                    document.getElementById("val-contrast").innerText = "1.0";
+                    
+                    set_status("Loaded image successfully.");
+                };
+                reader.readAsDataURL(file);
+            }
+        });
 
-        def set_status(text):
-            document.getElementById("status-text").innerText = "Status: " + str(text)
+        // Reset Image
+        function web_reset_image() {
+            if (originalBase64) {
+                currentBase64 = originalBase64;
+                document.getElementById('img-proc').src = originalBase64;
+                document.getElementById("slider-bright").value = "1.0";
+                document.getElementById("val-bright").innerText = "1.0";
+                document.getElementById("slider-contrast").value = "1.0";
+                document.getElementById("val-contrast").innerText = "1.0";
+                set_status("Reverted to original image.");
+            }
+        }
 
-        def display_images():
-            global original_image, processed_image
-            if original_image:
-                # Convert original PIL image to base64
-                buf_orig = io.BytesIO()
-                original_image.save(buf_orig, format="PNG")
-                base64_orig = base64.b64encode(buf_orig.getvalue()).decode('utf-8')
-                document.getElementById("img-orig").src = "data:image/png;base64," + base64_orig
+        // Call backend processing API
+        async function applyOperation(operation, params = {}) {
+            if (!currentBase64) {
+                alert("Please upload an image first.");
+                return;
+            }
+
+            loader.classList.add('active');
+            set_status("Processing... Please wait.");
             
-            if processed_image:
-                # Convert processed PIL image to base64
-                buf_proc = io.BytesIO()
-                processed_image.save(buf_proc, format="PNG")
-                base64_proc = base64.b64encode(buf_proc.getvalue()).decode('utf-8')
-                document.getElementById("img-proc").src = "data:image/png;base64," + base64_proc
+            try {
+                const response = await fetch('/api/process', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        image: currentBase64,
+                        operation: operation,
+                        params: params
+                    })
+                });
 
-        # File uploader hook
-        async def on_file_upload(event):
-            global original_image, processed_image
-            file_list = event.target.files
-            if file_list.length > 0:
-                js_file = file_list.item(0)
-                array_buffer = await js_file.arrayBuffer()
-                byte_array = Uint8Array.new(array_buffer)
-                
-                # Load image bytes into PIL
-                image_bytes = byte_array.to_py().tobytes()
-                img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-                
-                # Downsize if extremely large
-                if max(img.size) > 1000:
-                    img.thumbnail((1000, 1000), Image.Resampling.LANCZOS)
-                
-                original_image = img
-                processed_image = img.copy()
-                
-                # Reset sliders
-                document.getElementById("slider-bright").value = "1.0"
-                document.getElementById("val-bright").innerText = "1.0"
-                document.getElementById("slider-contrast").value = "1.0"
-                document.getElementById("val-contrast").innerText = "1.0"
-                
-                display_images()
-                set_status(f"Loaded image successfully ({img.width}x{img.height})")
+                const data = await response.json();
+                if (response.ok) {
+                    currentBase64 = data.image;
+                    document.getElementById('img-proc').src = currentBase64;
+                    set_status(data.status);
+                } else {
+                    alert("Error: " + data.detail);
+                    set_status("Operation failed.");
+                }
+            } catch (err) {
+                alert("Server communication error: " + err.message);
+                set_status("Connection error.");
+            } finally {
+                loader.classList.remove('active');
+            }
+        }
 
-        # Set up listener for file upload
-        file_input_listener = py_odide.create_javascript_message_listener(on_file_upload) if hasattr(window, 'py_odide') else None
-        # We bind the change event on HTML element to a python helper
-        from pyodide.ffi import create_proxy
-        
-        # Define actions
-        def web_reset_image():
-            global original_image, processed_image
-            if original_image:
-                processed_image = original_image.copy()
-                document.getElementById("slider-bright").value = "1.0"
-                document.getElementById("val-bright").innerText = "1.0"
-                document.getElementById("slider-contrast").value = "1.0"
-                document.getElementById("val-contrast").innerText = "1.0"
-                display_images()
-                set_status("Reverted to original image.")
+        // Individual control handlers mapping to operations
+        function web_on_point_change() {
+            if (!originalBase64) return;
+            const bVal = parseFloat(document.getElementById("slider-bright").value);
+            const cVal = parseFloat(document.getElementById("slider-contrast").value);
+            
+            // Adjustments are always relative to original image to prevent continuous degradation
+            applyOperation('brightness_contrast', { brightness: bVal, contrast: cVal });
+        }
 
-        def web_on_point_change():
-            global original_image, processed_image
-            if original_image:
-                b_val = float(document.getElementById("slider-bright").value)
-                c_val = float(document.getElementById("slider-contrast").value)
-                
-                np_orig = img_ops.pil_to_numpy(original_image)
-                temp = img_ops.adjust_brightness(np_orig, b_val)
-                temp = img_ops.adjust_contrast(temp, c_val)
-                
-                processed_image = img_ops.numpy_to_pil(temp)
-                display_images()
-                set_status(f"Adjusted Point Parameters: Brightness={b_val:.2f}, Contrast={c_val:.2f}")
+        function applyThreshold() {
+            const tVal = parseInt(document.getElementById("slider-thresh").value);
+            applyOperation('threshold', { threshold: tVal });
+        }
 
-        def web_apply_grayscale():
-            global processed_image
-            if processed_image:
-                np_proc = img_ops.pil_to_numpy(processed_image)
-                gray = img_ops.convert_to_grayscale(np_proc)
-                processed_image = img_ops.numpy_to_pil(gray)
-                display_images()
-                set_status("Converted to grayscale.")
+        function applyBlur(type) {
+            const size = parseInt(document.getElementById("select-blur-size").value);
+            applyOperation(type, { size: size });
+        }
 
-        def web_apply_negative():
-            global processed_image
-            if processed_image:
-                np_proc = img_ops.pil_to_numpy(processed_image)
-                neg = img_ops.invert_image(np_proc)
-                processed_image = img_ops.numpy_to_pil(neg)
-                display_images()
-                set_status("Applied image negative inversion.")
+        function applyCrop() {
+            const left = parseFloat(document.getElementById("slider-crop-left").value);
+            const right = parseFloat(document.getElementById("slider-crop-right").value);
+            applyOperation('crop', { left_pct: left, right_pct: right });
+        }
 
-        def web_apply_equalize():
-            global processed_image
-            if processed_image:
-                np_proc = img_ops.pil_to_numpy(processed_image)
-                equalized = img_ops.equalize_histogram(np_proc)
-                processed_image = img_ops.numpy_to_pil(equalized)
-                display_images()
-                set_status("Applied color-preserving Histogram Equalization.")
+        function applyChannelExtract() {
+            const model = document.getElementById("select-color-model").value;
+            const idx = parseInt(document.getElementById("select-channel-idx").value);
+            applyOperation('extract', { model: model, idx: idx });
+        }
 
-        def web_apply_threshold():
-            global processed_image
-            if processed_image:
-                t_val = int(document.getElementById("slider-thresh").value)
-                np_proc = img_ops.pil_to_numpy(processed_image)
-                binary = img_ops.apply_threshold(np_proc, t_val)
-                processed_image = img_ops.numpy_to_pil(binary)
-                display_images()
-                set_status(f"Applied threshold segmentation (value: {t_val}).")
+        function applyPseudocolor() {
+            const cmap = document.getElementById("select-cmap").value;
+            applyOperation('pseudocolor', { cmap: cmap });
+        }
 
-        def web_apply_otsu():
-            global processed_image
-            if processed_image:
-                np_proc = img_ops.pil_to_numpy(processed_image)
-                binary, t_val = img_ops.otsu_threshold(np_proc)
-                processed_image = img_ops.numpy_to_pil(binary)
-                display_images()
-                set_status(f"Otsu's auto threshold calculated: {t_val}. Applied binary threshold.")
+        function applyFrequencyFilter() {
+            const filtType = document.getElementById("select-freq-filt").value;
+            const cutoff = parseFloat(document.getElementById("slider-cutoff").value);
+            applyOperation('freq_filter', { filt_type: filtType, cutoff: cutoff });
+        }
 
-        def web_apply_box_blur():
-            global processed_image
-            if processed_image:
-                size = int(document.getElementById("select-blur-size").value)
-                np_proc = img_ops.pil_to_numpy(processed_image)
-                blurred = img_ops.box_blur(np_proc, size)
-                processed_image = img_ops.numpy_to_pil(blurred)
-                display_images()
-                set_status(f"Applied Box Blur (size: {size}x{size}).")
+        function applyKMeans() {
+            const k = parseInt(document.getElementById("slider-kmeans-k").value);
+            applyOperation('kmeans', { k: k });
+        }
 
-        def web_apply_gaussian_blur():
-            global processed_image
-            if processed_image:
-                size = int(document.getElementById("select-blur-size").value)
-                np_proc = img_ops.pil_to_numpy(processed_image)
-                blurred = img_ops.gaussian_blur(np_proc, size, size / 3.0)
-                processed_image = img_ops.numpy_to_pil(blurred)
-                display_images()
-                set_status(f"Applied Gaussian Blur (size: {size}x{size}, sigma: {size/3.0:.2f}).")
+        function applyMorphology() {
+            const op = document.getElementById("select-morph-op").value;
+            const threshold = parseInt(document.getElementById("slider-thresh").value);
+            applyOperation('morphology', { op: op, threshold: threshold });
+        }
 
-        def web_apply_median():
-            global processed_image
-            if processed_image:
-                size = int(document.getElementById("select-blur-size").value)
-                np_proc = img_ops.pil_to_numpy(processed_image)
-                denoised = img_ops.median_filter(np_proc, size)
-                processed_image = img_ops.numpy_to_pil(denoised)
-                display_images()
-                set_status(f"Applied Median Filter (size: {size}x{size}).")
+        function applyStegEncode() {
+            const msg = document.getElementById("txt-steg-msg").value;
+            if (!msg) {
+                alert("Please enter a secret message to hide.");
+                return;
+            }
+            applyOperation('steg_encode', { message: msg });
+        }
 
-        def web_apply_sharpen():
-            global processed_image
-            if processed_image:
-                np_proc = img_ops.pil_to_numpy(processed_image)
-                sharpened = img_ops.laplacian_sharpen(np_proc)
-                processed_image = img_ops.numpy_to_pil(sharpened)
-                display_images()
-                set_status("Applied Laplacian high-pass sharpening.")
+        async function applyStegDecode() {
+            if (!currentBase64) {
+                alert("Please upload an image first.");
+                return;
+            }
+            
+            loader.classList.add('active');
+            set_status("Decoding steganography... Please wait.");
+            
+            try {
+                const response = await fetch('/api/process', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        image: currentBase64,
+                        operation: 'steg_decode',
+                        params: {}
+                    })
+                });
 
-        def web_apply_unsharp():
-            global processed_image
-            if processed_image:
-                np_proc = img_ops.pil_to_numpy(processed_image)
-                sharpened = img_ops.unsharp_mask(np_proc)
-                processed_image = img_ops.numpy_to_pil(sharpened)
-                display_images()
-                set_status("Applied Unsharp Masking filter.")
+                const data = await response.json();
+                if (response.ok) {
+                    alert("Extracted Secret Message: " + data.message);
+                    set_status("Decoded message successfully: " + data.message);
+                } else {
+                    alert("No message signature found in Red LSB.");
+                    set_status("No hidden message found.");
+                }
+            } catch (err) {
+                alert("Server communication error: " + err.message);
+            } finally {
+                loader.classList.remove('active');
+            }
+        }
 
-        def web_apply_sobel():
-            global processed_image
-            if processed_image:
-                np_proc = img_ops.pil_to_numpy(processed_image)
-                edges = img_ops.edge_sobel(np_proc)
-                processed_image = img_ops.numpy_to_pil(edges)
-                display_images()
-                set_status("Applied Sobel edge detection.")
+        function applyDCT() {
+            const q = parseInt(document.getElementById("slider-dct-quality").value);
+            applyOperation('dct', { quality: q });
+        }
 
-        def web_apply_prewitt():
-            global processed_image
-            if processed_image:
-                np_proc = img_ops.pil_to_numpy(processed_image)
-                edges = img_ops.edge_prewitt(np_proc)
-                processed_image = img_ops.numpy_to_pil(edges)
-                display_images()
-                set_status("Applied Prewitt edge detection.")
+        // Draw default synthetic image on loading
+        function generateDefaultImage() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 450;
+            canvas.height = 450;
+            const ctx = canvas.getContext('2d');
+            
+            // 1. Diagonal gradient
+            for (let i = 0; i < 450; i++) {
+                const r = Math.floor((i / 450.0) * 200);
+                const g = Math.floor(((450 - i) / 450.0) * 200);
+                const b = 150;
+                ctx.strokeStyle = `rgb(${r}, ${g}, ${b})`;
+                ctx.beginPath();
+                ctx.moveTo(0, i);
+                ctx.lineTo(450, i);
+                ctx.stroke();
+            }
+            
+            // 2. Yellow circle
+            ctx.fillStyle = 'rgb(255, 215, 0)';
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.arc(225, 225, 75, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.stroke();
+            
+            // 3. Blue rectangle
+            ctx.fillStyle = 'rgb(30, 144, 255)';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.rect(50, 50, 70, 70);
+            ctx.fill();
+            ctx.stroke();
 
-        def web_apply_canny():
-            global processed_image
-            if processed_image:
-                np_proc = img_ops.pil_to_numpy(processed_image)
-                edges = img_ops.edge_canny(np_proc, low_threshold=30, high_threshold=80)
-                processed_image = img_ops.numpy_to_pil(edges)
-                display_images()
-                set_status("Applied Canny edge detection (low=30, high=80).")
+            // 4. White rectangle
+            ctx.fillStyle = 'white';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.rect(320, 50, 80, 70);
+            ctx.fill();
+            ctx.stroke();
+            
+            const base64 = canvas.toDataURL('image/png');
+            originalBase64 = base64;
+            currentBase64 = base64;
+            document.getElementById('img-orig').src = base64;
+            document.getElementById('img-proc').src = base64;
+        }
 
-        def web_apply_log():
-            global processed_image
-            if processed_image:
-                np_proc = img_ops.pil_to_numpy(processed_image)
-                edges = img_ops.edge_log(np_proc)
-                processed_image = img_ops.numpy_to_pil(edges)
-                display_images()
-                set_status("Applied Laplacian of Gaussian (LoG) edge detection.")
-
-        def web_apply_dog():
-            global processed_image
-            if processed_image:
-                np_proc = img_ops.pil_to_numpy(processed_image)
-                edges = img_ops.edge_dog(np_proc)
-                processed_image = img_ops.numpy_to_pil(edges)
-                display_images()
-                set_status("Applied Difference of Gaussians (DoG) edge detection.")
-
-        def web_apply_mirror(direction):
-            global processed_image
-            if processed_image:
-                np_proc = img_ops.pil_to_numpy(processed_image)
-                mirrored = img_ops.mirror_image(np_proc, direction)
-                processed_image = img_ops.numpy_to_pil(mirrored)
-                display_images()
-                set_status(f"Mirrored image: {direction}.")
-
-        def web_apply_rotate(angle):
-            global processed_image
-            if processed_image:
-                np_proc = img_ops.pil_to_numpy(processed_image)
-                rotated = img_ops.rotate_image(np_proc, angle)
-                processed_image = img_ops.numpy_to_pil(rotated)
-                display_images()
-                set_status(f"Rotated image by {-angle} degrees.")
-
-        def web_apply_crop():
-            global processed_image
-            if processed_image:
-                left_pct = float(document.getElementById("slider-crop-left").value) / 100.0
-                right_pct = float(document.getElementById("slider-crop-right").value) / 100.0
-                w, h = processed_image.size
-                x1 = int(w * left_pct)
-                x2 = int(w * right_pct)
-                y1 = int(h * left_pct)
-                y2 = int(h * right_pct)
-                
-                np_proc = img_ops.pil_to_numpy(processed_image)
-                cropped = img_ops.crop_image(np_proc, x1, y1, x2, y2)
-                processed_image = img_ops.numpy_to_pil(cropped)
-                display_images()
-                set_status(f"Cropped image to bounds: ({x1}, {y1}) to ({x2}, {y2}).")
-
-        def web_apply_extract():
-            global processed_image
-            if processed_image:
-                model = document.getElementById("select-color-model").value
-                idx = int(document.getElementById("select-channel-idx").value)
-                np_proc = img_ops.pil_to_numpy(processed_image)
-                channels = img_ops.get_color_channels(np_proc, model)
-                processed_image = img_ops.numpy_to_pil(channels[idx])
-                display_images()
-                set_status(f"Extracted {model} - Channel {idx+1}.")
-
-        def web_apply_pseudocolor():
-            global processed_image
-            if processed_image:
-                cmap = document.getElementById("select-cmap").value
-                np_proc = img_ops.pil_to_numpy(processed_image)
-                colored = img_ops.apply_pseudocolor(np_proc, cmap)
-                processed_image = img_ops.numpy_to_pil(colored)
-                display_images()
-                set_status(f"Mapped intensities to pseudocolor cmap: '{cmap}'.")
-
-        def web_apply_rgb_hist():
-            global processed_image
-            if processed_image:
-                np_proc = img_ops.pil_to_numpy(processed_image)
-                hist_img = img_ops.get_rgb_histogram(np_proc)
-                processed_image = hist_img
-                display_images()
-                set_status("Generated and rendered real-time RGB histogram.")
-
-        def web_apply_fft():
-            global processed_image
-            if processed_image:
-                np_proc = img_ops.pil_to_numpy(processed_image)
-                f_shift = img_ops.compute_fft(np_proc)
-                mag_spec = img_ops.get_fft_magnitude_spectrum(f_shift)
-                processed_image = img_ops.numpy_to_pil(mag_spec).convert("RGB")
-                display_images()
-                set_status("Displayed Fourier Transform log magnitude spectrum.")
-
-        def web_apply_freq_filter():
-            global processed_image
-            if processed_image:
-                filt_type = document.getElementById("select-freq-filt").value
-                cutoff = float(document.getElementById("slider-cutoff").value)
-                np_proc = img_ops.pil_to_numpy(processed_image)
-                reconstructed, _, _ = img_ops.apply_frequency_filter(np_proc, filt_type, cutoff)
-                processed_image = img_ops.numpy_to_pil(reconstructed)
-                display_images()
-                set_status(f"Applied frequency domain filter: {filt_type} (cutoff: {cutoff}).")
-
-        def web_apply_harris():
-            global processed_image
-            if processed_image:
-                np_proc = img_ops.pil_to_numpy(processed_image)
-                corners = img_ops.harris_corner_detector(np_proc)
-                processed_image = img_ops.numpy_to_pil(corners)
-                display_images()
-                set_status("Harris corner detection completed. Marked in red.")
-
-        def web_apply_lbp():
-            global processed_image
-            if processed_image:
-                np_proc = img_ops.pil_to_numpy(processed_image)
-                lbp = img_ops.compute_lbp(np_proc)
-                processed_image = img_ops.numpy_to_pil(lbp)
-                display_images()
-                set_status("Calculated Local Binary Pattern texture representation.")
-
-        def web_apply_kmeans():
-            global processed_image
-            if processed_image:
-                k = int(document.getElementById("slider-kmeans-k").value)
-                set_status(f"Running K-Means segmentation (K={k})... Please wait.")
-                # Brief UI redraw delay logic not strictly needed in web worker but we perform directly
-                np_proc = img_ops.pil_to_numpy(processed_image)
-                segmented = img_ops.kmeans_segmentation(np_proc, k)
-                processed_image = img_ops.numpy_to_pil(segmented)
-                display_images()
-                set_status(f"K-Means segmentation complete with {k} clusters.")
-
-        def web_apply_morphology():
-            global processed_image
-            if processed_image:
-                op = document.getElementById("select-morph-op").value
-                np_proc = img_ops.pil_to_numpy(processed_image)
-                # Binarize using threshold slider value
-                t_val = int(document.getElementById("slider-thresh").value)
-                morph = img_ops.binary_morphology(np_proc, op, t_val)
-                processed_image = img_ops.numpy_to_pil(morph)
-                display_images()
-                set_status(f"Applied morphology operation: {op} (binarized at threshold {t_val}).")
-
-        def web_apply_steg_encode():
-            global processed_image
-            if processed_image:
-                msg = document.getElementById("txt-steg-msg").value
-                if not msg:
-                    window.alert("Please enter a secret message to hide.")
-                    return
-                try:
-                    np_proc = img_ops.pil_to_numpy(processed_image)
-                    encoded = img_ops.lsb_steganography_encode(np_proc, msg)
-                    processed_image = img_ops.numpy_to_pil(encoded)
-                    display_images()
-                    set_status(f"Encoded secret message: '{msg}' inside Red LSB.")
-                except ValueError as ve:
-                    window.alert(str(ve))
-
-        def web_apply_steg_decode():
-            global processed_image
-            if processed_image:
-                np_proc = img_ops.pil_to_numpy(processed_image)
-                msg = img_ops.lsb_steganography_decode(np_proc)
-                if msg:
-                    window.alert(f"Extracted Secret Message: {msg}")
-                    set_status(f"Decoded message successfully: {msg}")
-                else:
-                    window.alert("No message signature found in Red channel LSB.")
-                    set_status("No hidden message found.")
-
-        def web_apply_dct():
-            global processed_image
-            if processed_image:
-                q = int(document.getElementById("slider-dct-quality").value)
-                np_proc = img_ops.pil_to_numpy(processed_image)
-                compressed, mse, psnr = img_ops.block_dct_compression(np_proc, q)
-                processed_image = img_ops.numpy_to_pil(compressed)
-                display_images()
-                set_status(f"Block-DCT quantised (quality: {q}): MSE={mse:.2f}, PSNR={psnr:.2f}dB.")
-
-        # Bind file input change listener
-        upload_input = document.getElementById("file-input")
-        proxy = create_proxy(on_file_upload)
-        upload_input.addEventListener("change", proxy)
-
-        # Generate default canvas content
-        # Run synthetic image generator
-        img = Image.new("RGB", (450, 450), color="white")
-        import PIL.ImageDraw as ImageDraw
-        draw = ImageDraw.Draw(img)
-        for i in range(450):
-            r = int((i / 450.0) * 200)
-            g = int(((450 - i) / 450.0) * 200)
-            b = 150
-            draw.line([(0, i), (450, i)], fill=(r, g, b))
-        draw.ellipse([150, 150, 300, 300], fill=(255, 215, 0), outline=(0, 0, 0), width=4)
-        draw.rectangle([50, 50, 120, 120], fill=(30, 144, 255), outline=(0, 0, 0), width=3)
-        draw.rectangle([320, 50, 400, 120], fill=(255, 255, 255), outline=(0, 0, 0), width=2)
-        
-        original_image = img
-        processed_image = img.copy()
-        display_images()
-
-        # Hide loading screen
-        document.getElementById("loading-overlay").style.opacity = "0"
-        # Delay display hide
-        async def remove_overlay():
-            import asyncio
-            await asyncio.sleep(0.5)
-            document.getElementById("loading-overlay").style.display = "none"
-        
-        import asyncio
-        asyncio.ensure_future(remove_overlay())
-        set_status("Ready. Load an image or modify parameters.")
+        generateDefaultImage();
     </script>
 </body>
 </html>
