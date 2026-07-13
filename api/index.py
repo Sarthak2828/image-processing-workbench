@@ -2,7 +2,7 @@ import base64
 import io
 import os
 import sys
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, FileResponse
 from pydantic import BaseModel
 from PIL import Image
 import numpy as np
@@ -193,3 +193,10 @@ async def process_image(req: ProcessRequest):
         return {"image": out_b64, "status": status}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/")
+async def get_index():
+    # index.html is located in the parent directory
+    parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    index_path = os.path.join(parent_dir, "index.html")
+    return FileResponse(index_path)
