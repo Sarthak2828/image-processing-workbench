@@ -12,9 +12,15 @@ from pydantic import BaseModel
 from PIL import Image
 import numpy as np
 
-# Add parent directory to path so we can import image_operations.py
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-import image_operations as img_ops
+# Try importing directly from the same folder first (Vercel standard), fallback to parent directory
+try:
+    import image_operations as img_ops
+except ImportError:
+    try:
+        from . import image_operations as img_ops
+    except ImportError:
+        sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+        import image_operations as img_ops
 
 app = FastAPI(title="UCS615 Image Processing Vercel API")
 
@@ -202,7 +208,9 @@ async def process_image(req: ProcessRequest):
 
 @app.get("/")
 async def get_index():
-    # index.html is located in the parent directory
-    parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    index_path = os.path.join(parent_dir, "index.html")
+    # Try local api folder first, then fallback to parent folder
+    index_path = os.path.join(os.path.dirname(__file__), "index.html")
+    if not os.path.exists(index_path):
+        parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        index_path = os.path.join(parent_dir, "index.html")
     return FileResponse(index_path)
