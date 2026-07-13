@@ -36,6 +36,7 @@ def pil_to_base64(pil_img):
     return "data:image/png;base64," + b64_bytes.decode('utf-8')
 
 @app.post("/api/process")
+@app.post("/process")
 async def process_image(req: ProcessRequest):
     try:
         pil_img = base64_to_pil(req.image)
