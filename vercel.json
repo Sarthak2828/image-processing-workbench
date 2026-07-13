@@ -1,4 +1,12 @@
 {
+  "functions": {
+    "api/**/*.py": {
+      "includeFiles": [
+        "image_operations.py",
+        "index.html"
+      ]
+    }
+  },
   "rewrites": [
     {
       "source": "/api/(.*)",
