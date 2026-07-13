@@ -3,10 +3,6 @@ import io
 import os
 import sys
 
-# Force matplotlib to use headless 'Agg' backend before any other imports
-import matplotlib
-matplotlib.use('Agg')
-
 from fastapi import FastAPI, HTTPException, FileResponse
 from pydantic import BaseModel
 from PIL import Image

@@ -1,6 +1,5 @@
 import numpy as np
 from PIL import Image, ImageDraw, ImageEnhance, ImageOps
-import matplotlib.pyplot as plt
 
 # ---------------------------------------------------------
 # Conversions
@@ -291,9 +290,13 @@ def apply_pseudocolor(np_img, colormap_name="jet"):
     # Convert to grayscale first
     gray = np.array(ImageOps.grayscale(numpy_to_pil(np_img)))
     
-    # Custom colormap mapping
-    cmap = plt.get_cmap(colormap_name)
-    colored = cmap(gray / 255.0)[:, :, :3] # float [0, 1]
+    # Pure NumPy implementation of Jet colormap (no matplotlib needed)
+    x = gray / 255.0
+    r = np.clip(1.5 - np.abs(4.0 * x - 3.0), 0.0, 1.0)
+    g = np.clip(1.5 - np.abs(4.0 * x - 2.0), 0.0, 1.0)
+    b = np.clip(1.5 - np.abs(4.0 * x - 1.0), 0.0, 1.0)
+    
+    colored = np.stack([r, g, b], axis=-1)
     return (colored * 255).astype(np.uint8)
 
 # ---------------------------------------------------------
@@ -691,30 +694,42 @@ def edge_canny(np_img, low_threshold=20, high_threshold=50):
 # RGB Histogram Generator
 # ---------------------------------------------------------
 def get_rgb_histogram(np_img):
-    from matplotlib.backends.backend_agg import FigureCanvasAgg
-    fig, ax = plt.subplots(figsize=(6, 4), dpi=100)
-    fig.patch.set_facecolor('#2c3e50')
-    ax.set_facecolor('#1a252f')
+    # Calculate histograms for R, G, B using numpy
+    h_r, _ = np.histogram(np_img[:, :, 0], bins=256, range=(0, 256))
+    h_g, _ = np.histogram(np_img[:, :, 1], bins=256, range=(0, 256))
+    h_b, _ = np.histogram(np_img[:, :, 2], bins=256, range=(0, 256))
     
-    colors = ('red', 'green', 'blue')
-    for i, color in enumerate(colors):
-        channel_data = np_img[:, :, i].flatten()
-        hist, bin_edges = np.histogram(channel_data, bins=256, range=(0, 256))
-        ax.plot(bin_edges[:-1], hist, color=color, alpha=0.8, linewidth=1.5)
+    # Create image canvas matching the dark theme
+    w, h = 600, 400
+    img = Image.new("RGB", (w, h), "#2c3e50")
+    draw = ImageDraw.Draw(img)
+    
+    # Draw a inner dark rectangle for the plot area
+    draw.rectangle([50, 50, 550, 350], fill="#1a252f", outline="white", width=1)
+    
+    # Normalize histogram values to fit inside 280px height
+    max_val = max(np.max(h_r), np.max(h_g), np.max(h_b), 1)
+    
+    # Draw horizontal grid lines
+    for y_val in [125, 200, 275]:
+        draw.line([50, y_val, 550, y_val], fill="#2c3e50", width=1)
         
-    ax.set_title("Real-Time RGB Histogram", color='white', fontsize=12, fontweight='bold')
-    ax.set_xlim([0, 256])
-    ax.tick_params(colors='white')
-    
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['left'].set_color('white')
-    ax.spines['bottom'].set_color('white')
-    ax.grid(True, color='#2c3e50', linestyle='--', alpha=0.5)
-    
-    plt.tight_layout()
-    canvas = FigureCanvasAgg(fig)
-    canvas.draw()
-    rgba = np.asarray(canvas.buffer_rgba())
-    plt.close(fig)
-    return Image.fromarray(rgba).convert("RGB")
+    # Draw curves
+    for hist, color in [(h_r, "red"), (h_g, "green"), (h_b, "blue")]:
+        points = []
+        for i in range(256):
+            x = 50 + (i / 255.0) * 500
+            y = 350 - (hist[i] / max_val) * 280
+            points.append((x, y))
+            
+        for idx in range(len(points) - 1):
+            draw.line([points[idx], points[idx+1]], fill=color, width=2)
+            
+    # Draw axes ticks
+    for i in range(0, 257, 64):
+        x = 50 + (i / 255.0) * 500
+        draw.line([x, 350, x, 355], fill="white", width=1)
+        
+    # Draw Title
+    draw.text((60, 20), "Real-Time RGB Histogram", fill="white")
+    return img
