@@ -1,10 +1,7 @@
 {
   "functions": {
     "api/index.py": {
-      "includeFiles": [
-        "image_operations.py",
-        "index.html"
-      ]
+      "includeFiles": "*"
     }
   },
   "rewrites": [
